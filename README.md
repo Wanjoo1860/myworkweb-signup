@@ -48,10 +48,10 @@ cp .dev.vars.example .dev.vars
 
 `.dev.vars` 파일에 실제 값 입력:
 
-```env
-TENANT_ID=77ad8ab8-7d87-4c2c-a442-8d26f9c8fab1
-CLIENT_ID=dcab512e-de4e-4f08-a23d-36c1149b2cf5
-CLIENT_SECRET=ea17eacf-5194-4611-b716-1e9249acd430
+```env 아래는 예제로 실제 값을 넣어야 함
+TENANT_ID=77ad8ab8-7d87-1111-a442-8d26f9c8abcd
+CLIENT_ID=dcab512e-de4e-1111-a23d-36c1149babcd
+CLIENT_SECRET=ea17eacf-5194-1111-b716-1e9249acabcd
 ```
 
 ### 4단계: 로컬 개발 서버 실행
@@ -136,13 +136,13 @@ npm run deploy
 ```bash
 # 프로덕션 환경 secrets 등록
 wrangler secret put TENANT_ID --env production
-# → 77ad8ab8-7d87-4c2c-a442-8d26f9c8fab1 입력
+# → 77ad8ab8-7d87-1111-a442-8d26f9c8abcd 입력
 
 wrangler secret put CLIENT_ID --env production
-# → dcab512e-de4e-4f08-a23d-36c1149b2cf5 입력
+# → dcab512e-de4e-1111-a23d-36c1149babcd 입력
 
 wrangler secret put CLIENT_SECRET --env production
-# → ea17eacf-5194-4611-b716-1e9249acd430 입력
+# → ea17eacf-5194-1111-b716-1e9249acabcd 입력
 
 # 배포
 wrangler deploy --env production
