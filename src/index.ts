@@ -504,6 +504,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
       throw new Error('초대 생성 실패');
     }
 
+    // ✅ 수정: result → invitationResult
     console.log('Invitation created:', invitationResult.id);
 
     // 3. SharePoint List에 저장
