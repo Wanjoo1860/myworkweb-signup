@@ -18,10 +18,8 @@ REDIRECT_URL = "http://localhost:8787/login"
 
 [env.production]
 name = "production"
-route = "myworkweb-signup.wjlee1860.workers.dev/*"
 workers_dev = true
 
 [env.production.vars]
 SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
 REDIRECT_URL = "https://myworkweb-signup.wjlee1860.workers.dev/login"
-
