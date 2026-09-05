@@ -20,6 +20,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // 🔴 DEBUG: env 확인
+    console.log('=== FETCH START ===');
+    console.log('env.TENANT_ID:', env.TENANT_ID);
+    console.log('env.CLIENT_ID:', env.CLIENT_ID);
+    console.log('env.CLIENT_SECRET:', env.CLIENT_SECRET ? '***set***' : 'UNDEFINED');
+    console.log('pathname:', url.pathname);
+
     // CORS 프리플라이트 처리
     if (request.method === 'OPTIONS') {
       return handleCORS();
@@ -250,7 +257,7 @@ function getSignupPage(): Response {
             }
           } catch (err) {
             messageDiv.className = 'message error';
-            messageDiv.textContent = '❌ 요청 실패: ' + err.message;
+            messageDiv.textContent = '❌ 요청 실패: ' + (err instanceof Error ? err.message : '알 수 없음');
           } finally {
             submitBtn.disabled = false;
             loading.style.display = 'none';
@@ -460,6 +467,12 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   try {
     const body = (await request.json()) as SignupRequest;
 
+    // 🔴 DEBUG: env 확인
+    console.log('=== SIGNUP REQUEST ===');
+    console.log('env.TENANT_ID:', env.TENANT_ID);
+    console.log('env.CLIENT_ID:', env.CLIENT_ID);
+    console.log('env.CLIENT_SECRET:', env.CLIENT_SECRET ? '***set***' : 'UNDEFINED');
+
     // 검증
     if (!body.email || !isValidEmail(body.email)) {
       return jsonResponse({ error: '유효한 이메일을 입력하세요.' }, 400);
@@ -470,6 +483,16 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
     }
 
     console.log('Signup request:', { email: body.email, firstName: body.firstName, lastName: body.lastName });
+
+    // Secrets 필수 검증
+    if (!env.TENANT_ID || !env.CLIENT_ID || !env.CLIENT_SECRET) {
+      console.error('Missing required secrets!', { 
+        TENANT_ID: !!env.TENANT_ID, 
+        CLIENT_ID: !!env.CLIENT_ID, 
+        CLIENT_SECRET: !!env.CLIENT_SECRET 
+      });
+      return jsonResponse({ error: '서버 구성 오류: 필수 자격증명이 설정되지 않았습니다.' }, 500);
+    }
 
     // 1. Graph API 토큰 획득
     const token = await getGraphToken(env.TENANT_ID, env.CLIENT_ID, env.CLIENT_SECRET);
@@ -505,7 +528,18 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
 // ============ Microsoft Graph API ============
 
 async function getGraphToken(tenantId: string, clientId: string, clientSecret: string): Promise<string> {
+  // 🔴 DEBUG
+  console.log('=== GET GRAPH TOKEN ===');
+  console.log('tenantId:', tenantId);
+  console.log('clientId:', clientId);
+  console.log('clientSecret:', clientSecret ? '***set***' : 'UNDEFINED');
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error(`Missing credentials: tenantId=${tenantId}, clientId=${clientId}, clientSecret=${clientSecret ? 'set' : 'undefined'}`);
+  }
+
   const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  console.log('Token URL:', url);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -520,14 +554,20 @@ async function getGraphToken(tenantId: string, clientId: string, clientSecret: s
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('Token request failed:', response.status, error);
     throw new Error(`Token error: ${response.statusText} - ${error}`);
   }
 
   const data = (await response.json()) as any;
+  console.log('Token acquired successfully');
   return data.access_token;
 }
 
 async function inviteGuestUser(email: string, redirectUrl: string, token: string): Promise<any> {
+  console.log('=== INVITE GUEST USER ===');
+  console.log('email:', email);
+  console.log('redirectUrl:', redirectUrl);
+
   const response = await fetch('https://graph.microsoft.com/v1.0/invitations', {
     method: 'POST',
     headers: {
@@ -547,16 +587,22 @@ async function inviteGuestUser(email: string, redirectUrl: string, token: string
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('Invitation request failed:', response.status, error);
     throw new Error(`Invitation error: ${response.statusText} - ${error}`);
   }
 
-  return await response.json();
+  const result = await response.json();
+  console.log('Invitation created:', result.id);
+  return result;
 }
 
 // ============ SharePoint API ============
 
 async function saveToSharePoint(data: SignupRequest, sharePointSiteUrl: string, token: string): Promise<void> {
   try {
+    console.log('=== SAVE TO SHAREPOINT ===');
+    console.log('sharePointSiteUrl:', sharePointSiteUrl);
+
     // Step 1: 리스트 메타데이터 조회
     const listUrl = `${sharePointSiteUrl}/_api/web/lists/GetByTitle('Registrations')`;
     const listResponse = await fetch(listUrl, {
@@ -615,6 +661,7 @@ async function saveToSharePoint(data: SignupRequest, sharePointSiteUrl: string, 
 
     if (!itemResponse.ok) {
       const error = await itemResponse.text();
+      console.error('Item creation failed:', itemResponse.status, error);
       throw new Error(`Item creation failed: ${itemResponse.statusText} - ${error}`);
     }
 
