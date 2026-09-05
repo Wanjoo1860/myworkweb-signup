@@ -591,7 +591,7 @@ async function inviteGuestUser(email: string, redirectUrl: string, token: string
     console.error('Invitation request failed:', response.status, error);
     throw new Error(`Invitation error: ${response.statusText} - ${error}`);
   }
-
+  
   const result = (await response.json()) as any;
   console.log('Invitation created:', result.id);
   return result;
