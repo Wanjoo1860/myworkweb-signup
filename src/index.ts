@@ -245,7 +245,7 @@ function getSignupPage(): Response {
               body: JSON.stringify(formData)
             });
 
-            const result = await response.json();
+            const result = (await response.json()) as { id?: string };
 
             if (response.ok) {
               messageDiv.className = 'message success';
