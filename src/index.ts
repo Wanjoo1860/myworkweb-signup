@@ -6,9 +6,11 @@ export interface Env {
   CLIENT_SECRET: string;
   SHAREPOINT_SITE_URL: string;
   REDIRECT_URL: string;
+  SHAREPOINT_LIST_ID: string;
+  SHAREPOINT_SITE_ID: string;
 }
 
-interface SignupRequest {
+interface SignupData {
   firstName: string;
   lastName: string;
   email: string;
@@ -25,6 +27,8 @@ export default {
     console.log('env.TENANT_ID:', env.TENANT_ID);
     console.log('env.CLIENT_ID:', env.CLIENT_ID);
     console.log('env.CLIENT_SECRET:', env.CLIENT_SECRET ? '***set***' : 'UNDEFINED');
+    console.log('env.SHAREPOINT_LIST_ID:', env.SHAREPOINT_LIST_ID);
+    console.log('env.SHAREPOINT_SITE_ID:', env.SHAREPOINT_SITE_ID);
     console.log('pathname:', url.pathname);
 
     // CORS 프리플라이트 처리
@@ -465,13 +469,15 @@ function getLoginPage(): Response {
 
 async function handleSignup(request: Request, env: Env): Promise<Response> {
   try {
-    const body = (await request.json()) as SignupRequest;
+    const body = (await request.json()) as SignupData;
 
     // 🔴 DEBUG: env 확인
     console.log('=== SIGNUP REQUEST ===');
     console.log('env.TENANT_ID:', env.TENANT_ID);
     console.log('env.CLIENT_ID:', env.CLIENT_ID);
     console.log('env.CLIENT_SECRET:', env.CLIENT_SECRET ? '***set***' : 'UNDEFINED');
+    console.log('env.SHAREPOINT_LIST_ID:', env.SHAREPOINT_LIST_ID);
+    console.log('env.SHAREPOINT_SITE_ID:', env.SHAREPOINT_SITE_ID);
 
     // 검증
     if (!body.email || !isValidEmail(body.email)) {
@@ -494,8 +500,17 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
       return jsonResponse({ error: '서버 구성 오류: 필수 자격증명이 설정되지 않았습니다.' }, 500);
     }
 
+    // SharePoint 환경변수 검증
+    if (!env.SHAREPOINT_LIST_ID || !env.SHAREPOINT_SITE_ID) {
+      console.error('Missing SharePoint configuration!', {
+        SHAREPOINT_LIST_ID: !!env.SHAREPOINT_LIST_ID,
+        SHAREPOINT_SITE_ID: !!env.SHAREPOINT_SITE_ID
+      });
+      return jsonResponse({ error: '서버 구성 오류: SharePoint 설정이 없습니다.' }, 500);
+    }
+
     // 1. Graph API 토큰 획득
-    const token = await getGraphToken(env.TENANT_ID, env.CLIENT_ID, env.CLIENT_SECRET);
+    const token = await getGraphToken(env);
 
     // 2. Teams 게스트 초대
     const invitationResult = await inviteGuestUser(body.email, env.REDIRECT_URL, token);
@@ -508,7 +523,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
     console.log('Invitation created:', invitationResult.id);
 
     // 3. SharePoint List에 저장
-    await saveToSharePoint(body, env.SHAREPOINT_SITE_URL, token);
+    await saveToSharePoint(body, env, token);
 
     console.log('Data saved to SharePoint');
 
@@ -528,26 +543,26 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
 
 // ============ Microsoft Graph API ============
 
-async function getGraphToken(tenantId: string, clientId: string, clientSecret: string): Promise<string> {
+async function getGraphToken(env: Env): Promise<string> {
   // 🔴 DEBUG
   console.log('=== GET GRAPH TOKEN ===');
-  console.log('tenantId:', tenantId);
-  console.log('clientId:', clientId);
-  console.log('clientSecret:', clientSecret ? '***set***' : 'UNDEFINED');
+  console.log('tenantId:', env.TENANT_ID);
+  console.log('clientId:', env.CLIENT_ID);
+  console.log('clientSecret:', env.CLIENT_SECRET ? '***set***' : 'UNDEFINED');
 
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error(`Missing credentials: tenantId=${tenantId}, clientId=${clientId}, clientSecret=${clientSecret ? 'set' : 'undefined'}`);
+  if (!env.TENANT_ID || !env.CLIENT_ID || !env.CLIENT_SECRET) {
+    throw new Error(`Missing credentials: TENANT_ID=${!!env.TENANT_ID}, CLIENT_ID=${!!env.CLIENT_ID}, CLIENT_SECRET=${!!env.CLIENT_SECRET}`);
   }
 
-  const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const url = `https://login.microsoftonline.com/${env.TENANT_ID}/oauth2/v2.0/token`;
   console.log('Token URL:', url);
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
+      client_id: env.CLIENT_ID,
+      client_secret: env.CLIENT_SECRET,
       scope: 'https://graph.microsoft.com/.default',
       grant_type: 'client_credentials'
     }).toString()
@@ -597,76 +612,52 @@ async function inviteGuestUser(email: string, redirectUrl: string, token: string
   return result;
 }
 
-// ============ SharePoint API ============
+// ============ SharePoint API (Microsoft Graph 사용) ============
 
-async function saveToSharePoint(data: SignupRequest, sharePointSiteUrl: string, token: string): Promise<void> {
+async function saveToSharePoint(data: SignupData, env: Env, token: string): Promise<void> {
   try {
     console.log('=== SAVE TO SHAREPOINT ===');
-    console.log('sharePointSiteUrl:', sharePointSiteUrl);
+    console.log('siteId:', env.SHAREPOINT_SITE_ID);
+    console.log('listId:', env.SHAREPOINT_LIST_ID);
 
-    // Step 1: 리스트 메타데이터 조회
-    const listUrl = `${sharePointSiteUrl}/_api/web/lists/GetByTitle('Registrations')`;
-    const listResponse = await fetch(listUrl, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
-      }
-    });
+    const siteId = env.SHAREPOINT_SITE_ID;
+    const listId = env.SHAREPOINT_LIST_ID;
 
-    if (!listResponse.ok) {
-      throw new Error(`List not found: ${listResponse.statusText}`);
-    }
+    // SharePoint 리스트 아이템 생성 (Microsoft Graph REST API)
+    const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`;
 
-    const listData = (await listResponse.json()) as any;
-    const listItemEntityTypeFullName = listData.ListItemEntityTypeFullName;
-
-    // Step 2: CSRF 토큰(Digest) 획득
-    const contextUrl = `${sharePointSiteUrl}/_api/contextinfo`;
-    const contextResponse = await fetch(contextUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Length': '0'
-      }
-    });
-
-    if (!contextResponse.ok) {
-      throw new Error(`Context error: ${contextResponse.statusText}`);
-    }
-
-    const contextData = (await contextResponse.json()) as any;
-    const digest = contextData.FormDigestValue;
-
-    // Step 3: 아이템 생성
-    const itemUrl = `${sharePointSiteUrl}/_api/web/lists/GetByTitle('Registrations')/items`;
-    const itemResponse = await fetch(itemUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-RequestDigest': digest,
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({
-        __metadata: { type: listItemEntityTypeFullName },
-        Title: `${data.firstName} ${data.lastName}`,
+    const itemData = {
+      fields: {
+        Title: `${data.lastName} ${data.firstName}`,
         FirstName: data.firstName,
         LastName: data.lastName,
         Email: data.email,
         Phone: data.phone || '',
         Company: data.company || '',
-        RegistrationDate: new Date().toISOString()
-      })
+        RegistrationDate: new Date().toISOString().split('T')[0] // YYYY-MM-DD 형식
+      }
+    };
+
+    console.log('Creating SharePoint item:', itemData);
+
+    const itemResponse = await fetch(itemUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify(itemData)
     });
 
     if (!itemResponse.ok) {
       const error = await itemResponse.text();
       console.error('Item creation failed:', itemResponse.status, error);
-      throw new Error(`Item creation failed: ${itemResponse.statusText} - ${error}`);
+      throw new Error(`SharePoint item creation failed: ${itemResponse.statusText} - ${error}`);
     }
 
-    console.log('Item created successfully');
+    const result = (await itemResponse.json()) as any;
+    console.log('SharePoint item created successfully:', result.id);
   } catch (error: any) {
     console.error('SharePoint save error:', error.message || error);
     throw error;
