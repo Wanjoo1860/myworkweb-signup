@@ -8,18 +8,19 @@ account_id = "783a9c9379e73a460d4cc9b0d76e164f"
 command = "npm install && npm run build"
 cwd = "."
 
+# 기본 환경 vars (production과 동일)
+[vars]
+SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
+REDIRECT_URL = "https://myworkweb-signup.wjlee1860.workers.dev/login"
+TENANT_ID = "77ad8ab8-7d87-4c2c-a442-8d26f9c8fab1"
+CLIENT_ID = "dcab512e-de4e-4f08-a23d-36c1149b2cf5"
+
+# 개발 환경 (선택사항)
 [env.development]
 workers_dev = true
 
 [env.development.vars]
 SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
 REDIRECT_URL = "http://localhost:8787/login"
-
-[env.production]
-workers_dev = true
-
-[env.production.vars]
-SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
-REDIRECT_URL = "https://myworkweb-signup.wjlee1860.workers.dev/login"
 TENANT_ID = "77ad8ab8-7d87-4c2c-a442-8d26f9c8fab1"
 CLIENT_ID = "dcab512e-de4e-4f08-a23d-36c1149b2cf5"
