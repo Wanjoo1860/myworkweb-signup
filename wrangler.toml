@@ -2,12 +2,13 @@ name = "myworkweb-signup"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 workers_dev = true
-account_id = "783a9c9379e73a460d4cc9b0d76e164f"
 
-[build]
-command = "npm install && npm run build"
-cwd = "."
+# 기본 환경 vars
+[vars]
+SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
+REDIRECT_URL = "https://myworkweb-signup.wjlee1860.workers.dev/login"
 
+# 개발 환경 (선택사항)
 [env.development]
 name = "development"
 workers_dev = true
@@ -16,6 +17,7 @@ workers_dev = true
 SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
 REDIRECT_URL = "http://localhost:8787/login"
 
+# 운영 환경
 [env.production]
 name = "production"
 workers_dev = true
