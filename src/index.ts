@@ -245,7 +245,7 @@ function getSignupPage(): Response {
               body: JSON.stringify(formData)
             });
 
-            const result = (await response.json()) as { id?: string };
+            const result = (await response.json()) as any;
 
             if (response.ok) {
               messageDiv.className = 'message success';
@@ -591,7 +591,7 @@ async function inviteGuestUser(email: string, redirectUrl: string, token: string
     throw new Error(`Invitation error: ${response.statusText} - ${error}`);
   }
 
-  const result = (await response.json()) as { id?: string };
+  const result = (await response.json()) as any;
   console.log('Invitation created:', result.id);
   return result;
 }
