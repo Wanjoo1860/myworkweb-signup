@@ -1,0 +1,31 @@
+name = "myworkweb-signup"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+workers_dev = true
+account_id = "YOUR_ACCOUNT_ID"  # Cloudflare Dashboard에서 확인
+zone_id = "YOUR_ZONE_ID"        # (선택사항) 커스텀 도메인 사용 시
+
+[build]
+command = "npm install && npm run build"
+cwd = "."
+
+# 🔵 개발 환경 (로컬 개발)
+[env.development]
+name = "development"
+workers_dev = true
+
+[env.development.vars]
+SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
+REDIRECT_URL = "http://localhost:8787/login"
+
+# 🟢 프로덕션 환경 (배포)
+[env.production]
+name = "production"
+route = "myworkweb-signup.wjlee1860.workers.dev/*"
+workers_dev = true
+
+[env.production.vars]
+SHAREPOINT_SITE_URL = "https://myworkweb.sharepoint.com/sites/myworkhome"
+REDIRECT_URL = "https://myworkweb-signup.wjlee1860.workers.dev/login"
+
+# 🔐 Secrets은 환경 변수로 관리 (wrangler secret put 명령 사용)
